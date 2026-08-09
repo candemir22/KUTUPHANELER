@@ -80,7 +80,7 @@ tessScript.onload = async () => {
       gzip: false,
     });
     await worker.setParameters({ tessedit_pageseg_mode: '11' });
-    const { data } = await worker.recognize('../../gercek_cizim.jpg');
+    const { data } = await worker.recognize('test_gorseli.png');
     const bulunanSayilar = (data.text.match(/\d+/g) || []).join(', ');
     satirEkle(`Tesseract.js YEREL dosyalarla OCR yaptı! Bulunan sayılar: [${bulunanSayilar}] — tam metin: "${data.text.trim().replace(/\n/g,' | ')}"`, bulunanSayilar.includes('2000') && bulunanSayilar.includes('1500'));
     await worker.terminate();
@@ -90,6 +90,33 @@ tessScript.onload = async () => {
 };
 tessScript.onerror = () => satirEkle('tesseract.min.js dosyası yüklenemedi', false);
 document.head.appendChild(tessScript);
+
+// ============ 5) TENSORFLOW.JS TESTİ ============
+const tfScript = document.createElement('script');
+tfScript.src = '../kutuphaneler/tensorflow/tf.min.js';
+tfScript.onload = async () => {
+  try{
+    const a = tf.tensor([1,2,3]);
+    const b = tf.tensor([4,5,6]);
+    const c = a.add(b);
+    const sonuc = await c.data();
+    satirEkle(`TensorFlow.js yüklendi ve çalışıyor (test: [1,2,3]+[4,5,6] = [${sonuc.join(',')}])`, sonuc[0]===5);
+  }catch(e){ satirEkle('TensorFlow.js hatası: ' + e.message, false); }
+};
+tfScript.onerror = () => satirEkle('tf.min.js dosyası yüklenemedi', false);
+document.head.appendChild(tfScript);
+
+// ============ 6) FACE-API.JS TESTİ ============
+const faceScript = document.createElement('script');
+faceScript.src = '../kutuphaneler/yuz-tanima/face-api.min.js';
+faceScript.onload = async () => {
+  try{
+    await faceapi.nets.tinyFaceDetector.loadFromUri('../kutuphaneler/yuz-tanima/weights');
+    satirEkle('face-api.js yüklendi ve model dosyaları (tiny_face_detector) başarıyla okundu', true);
+  }catch(e){ satirEkle('face-api.js model yükleme hatası: ' + e.message, false); }
+};
+faceScript.onerror = () => satirEkle('face-api.min.js dosyası yüklenemedi', false);
+document.head.appendChild(faceScript);
 </script>
 </body>
 </html>
