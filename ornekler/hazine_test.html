@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Hazine Test — CDN'siz Yerel Kütüphaneler</title>
+<style>
+  body{ font-family:monospace; background:#0B3D5C; color:#F0EDE4; padding:30px; }
+  .satir{ padding:8px; margin-bottom:6px; border-left:3px solid #4C96AE; }
+  .basarili{ border-left-color:#5FBE8A; color:#5FBE8A; }
+  .hata{ border-left-color:#C1592A; color:#C1592A; }
+</style>
+</head>
+<body>
+<h1>🗄️ Hazine Test — Yerel Kütüphane Kontrolü</h1>
+<div id="sonuclar">Test ediliyor…</div>
+
+<script type="module">
+const sonuclar = document.getElementById('sonuclar');
+function satirEkle(metin, basarili){
+  const div = document.createElement('div');
+  div.className = 'satir ' + (basarili ? 'basarili' : 'hata');
+  div.textContent = (basarili ? '✅ ' : '❌ ') + metin;
+  sonuclar.appendChild(div);
+}
+sonuclar.innerHTML = '';
+
+// ============ 1) THREE.JS TESTİ ============
+try{
+  const THREE = await import('../kutuphaneler/threejs/three.module.min.js');
+  const scene = new THREE.Scene();
+  const kup = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial());
+  scene.add(kup);
+  satirEkle(`Three.js yüklendi, sahneye küp eklendi (${scene.children.length} obje) — sürüm çalışıyor`, true);
+}catch(e){ satirEkle('Three.js hatası: ' + e.message, false); }
+
+// ============ 2) PDF.JS TESTİ ============
+try{
+  const pdfjsLib = await import('../kutuphaneler/pdfjs/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '../kutuphaneler/pdfjs/pdf.worker.min.mjs';
+  satirEkle(`PDF.js yüklendi (versiyon: ${pdfjsLib.version || 'bilinmiyor'})`, true);
+}catch(e){ satirEkle('PDF.js hatası: ' + e.message, false); }
+
+// ============ 3) OPENCV.JS TESTİ ============
+const cvScript = document.createElement('script');
+cvScript.src = '../kutuphaneler/opencv/opencv.js';
+cvScript.onload = () => {
+  try{
+    if (cv instanceof Promise){
+      cv.then(gercekCv => {
+        window.cv = gercekCv; // global referansı gerçek modülle değiştir
+        const mat = new cv.Mat(10, 10, cv.CV_8UC1);
+        satirEkle(`OpenCV.js yüklendi ve çalışıyor (test Mat boyutu: ${mat.rows}x${mat.cols})`, true);
+        mat.delete();
+      }).catch(e => satirEkle('OpenCV.js Promise hatası: ' + e.message, false));
+    } else if (cv.Mat) {
+      const mat = new cv.Mat(10, 10, cv.CV_8UC1);
+      satirEkle(`OpenCV.js yüklendi ve çalışıyor (test Mat boyutu: ${mat.rows}x${mat.cols})`, true);
+      mat.delete();
+    } else {
+      cv.onRuntimeInitialized = () => {
+        const mat = new cv.Mat(10, 10, cv.CV_8UC1);
+        satirEkle(`OpenCV.js yüklendi ve çalışıyor (test Mat boyutu: ${mat.rows}x${mat.cols})`, true);
+        mat.delete();
+      };
+    }
+  }catch(e){ satirEkle('OpenCV.js onload hatasi: ' + e.message, false); }
+};
+cvScript.onerror = () => satirEkle('OpenCV.js dosyası yüklenemedi', false);
+document.head.appendChild(cvScript);
+
+// ============ 4) TESSERACT.JS TESTİ (en kritik - OCR) ============
+const tessScript = document.createElement('script');
+tessScript.src = '../kutuphaneler/tesseract/tesseract.min.js';
+tessScript.onload = async () => {
+  try{
+    const worker = await Tesseract.createWorker('eng', 1, {
+      workerPath: '../kutuphaneler/tesseract/worker.min.js',
+      corePath: '../kutuphaneler/tesseract/core/tesseract-core-simd-lstm.wasm.js',
+      langPath: '../kutuphaneler/tesseract/tessdata',
+      gzip: false,
+    });
+    await worker.setParameters({ tessedit_pageseg_mode: '11' });
+    const { data } = await worker.recognize('../../gercek_cizim.jpg');
+    const bulunanSayilar = (data.text.match(/\d+/g) || []).join(', ');
+    satirEkle(`Tesseract.js YEREL dosyalarla OCR yaptı! Bulunan sayılar: [${bulunanSayilar}] — tam metin: "${data.text.trim().replace(/\n/g,' | ')}"`, bulunanSayilar.includes('2000') && bulunanSayilar.includes('1500'));
+    await worker.terminate();
+  }catch(e){
+    satirEkle('Tesseract.js hatası: ' + e.message, false);
+  }
+};
+tessScript.onerror = () => satirEkle('tesseract.min.js dosyası yüklenemedi', false);
+document.head.appendChild(tessScript);
+</script>
+</body>
+</html>
